@@ -88,10 +88,9 @@
         cursor: pointer;
         transition: border-color 0.2s, transform 0.15s;
       }
-      .curtir:hover:not(:disabled) { border-color: var(--accent); }
-      .curtir:active:not(:disabled) { transform: scale(0.96); }
+      .curtir:hover { border-color: var(--accent); }
+      .curtir:active { transform: scale(0.96); }
       .curtir:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-      .curtir:disabled { cursor: default; }
 
       .curtir svg {
         width: 24px;
@@ -131,51 +130,52 @@
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 21s-7.5-4.6-9.5-9.4C1.2 8.4 3.3 4.5 7 4.5c2.1 0 3.6 1.1 5 3 1.4-1.9 2.9-3 5-3 3.7 0 5.8 3.9 4.5 7.1C19.5 16.4 12 21 12 21z" />
         </svg>
-        <span class="contador" id="contador">0</span>
+        <span class="contador" id="contador">–</span>
       </button>
     </main>
 
     <script>
-      // Contador compartilhado no serviço gratuito Abacus (https://abacus.jasoncameron.dev)
+      // Contador compartilhado no serviço gratuito Abacus (https://abacus.jasoncameron.dev).
+      // Cada clique soma 1 no servidor; o número salvo lá é o que aparece para todo mundo.
       const API = "https://abacus.jasoncameron.dev";
       const CHAVE = "clone-tabnews-ia-poema/instante";
-      const MARCA = "poema-instante-curtido";
 
       const botao = document.getElementById("curtir");
       const contador = document.getElementById("contador");
 
-      function jaCurtiu() {
-        try { return localStorage.getItem(MARCA) === "1"; } catch { return false; }
-      }
+      let valor = null; // null = ainda não sabemos o número do servidor
 
-      function marcarCurtido() {
-        try { localStorage.setItem(MARCA, "1"); } catch {}
-        botao.classList.add("curtido");
-        botao.disabled = true;
-        botao.setAttribute("aria-label", "Você curtiu este poema");
+      function mostrar() {
+        contador.textContent = valor === null ? "–" : valor;
       }
 
       async function carregar() {
         try {
           const r = await fetch(`${API}/get/${CHAVE}`, { cache: "no-store" });
-          if (!r.ok) return;
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const dados = await r.json();
-          if (typeof dados.value === "number") contador.textContent = dados.value;
-        } catch {}
+          if (typeof dados.value === "number") valor = Math.max(valor ?? 0, dados.value);
+        } catch (erro) {
+          console.error("Não foi possível carregar as curtidas:", erro);
+        }
+        mostrar();
       }
 
       botao.addEventListener("click", async () => {
-        if (jaCurtiu()) return;
-        marcarCurtido();
-        contador.textContent = (parseInt(contador.textContent, 10) || 0) + 1;
+        botao.classList.add("curtido");
+        if (valor !== null) { valor += 1; mostrar(); }
         try {
           const r = await fetch(`${API}/hit/${CHAVE}`, { cache: "no-store" });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const dados = await r.json();
-          contador.textContent = dados.value;
-        } catch {}
+          if (typeof dados.value === "number") valor = Math.max(valor ?? 0, dados.value);
+        } catch (erro) {
+          console.error("Não foi possível salvar a curtida:", erro);
+          if (valor !== null) valor -= 1;
+        }
+        mostrar();
       });
 
-      if (jaCurtiu()) marcarCurtido();
       carregar();
 
       // No celular a aba fica "congelada" em segundo plano e volta sem recarregar:
