@@ -157,12 +157,11 @@
 
       async function carregar() {
         try {
-          const r = await fetch(`${API}/get/${CHAVE}`);
-          const dados = r.ok ? await r.json() : { value: 0 };
-          contador.textContent = dados.value ?? 0;
-        } catch {
-          contador.textContent = "0";
-        }
+          const r = await fetch(`${API}/get/${CHAVE}`, { cache: "no-store" });
+          if (!r.ok) return;
+          const dados = await r.json();
+          if (typeof dados.value === "number") contador.textContent = dados.value;
+        } catch {}
       }
 
       botao.addEventListener("click", async () => {
@@ -170,7 +169,7 @@
         marcarCurtido();
         contador.textContent = (parseInt(contador.textContent, 10) || 0) + 1;
         try {
-          const r = await fetch(`${API}/hit/${CHAVE}`);
+          const r = await fetch(`${API}/hit/${CHAVE}`, { cache: "no-store" });
           const dados = await r.json();
           contador.textContent = dados.value;
         } catch {}
@@ -178,6 +177,13 @@
 
       if (jaCurtiu()) marcarCurtido();
       carregar();
+
+      // No celular a aba fica "congelada" em segundo plano e volta sem recarregar:
+      // busca o número de novo sempre que a página volta a ficar visível.
+      window.addEventListener("pageshow", (e) => { if (e.persisted) carregar(); });
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") carregar();
+      });
     </script>
   </body>
 </html>
